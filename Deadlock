@@ -1,0 +1,94 @@
+from collections import deque
+
+# Procedure I: Simply detects the existence of a Cycle
+def has_cycle(graph):
+    visited = set()
+    stack = set()
+
+    def dfs(node):
+        visited.add(node)
+        stack.add(node)
+
+        for neighbor in graph[node]:
+            if neighbor not in visited:
+                if dfs(neighbor):
+                    return True
+            elif neighbor in stack:
+                return True
+
+        stack.remove(node)
+        return False
+
+    for node in graph:
+        if node not in visited:
+            if dfs(node):
+                return True
+
+    return False
+
+
+# Procedure II: On a copy of the graph, checks for deadlock and removes any deadlocks
+def detect_deadlock(graph, allocation_matrix, request_matrix):
+    resources = len(graph)
+    processes = set(range(len(allocation_matrix)))
+    holds = [set() for _ in range(resources)]
+    finished = set()
+
+    while processes - finished:
+        # Find a process that can be completed with the current available resources
+        queue = deque(processes - finished)
+        while queue:
+            node = queue.popleft()
+            if all(request_matrix[node][i] <= holds[i] for i in range(resources)):
+                # Satisfy the process needs with available resources
+                for i in range(resources):
+                    holds[i].difference_update({node})
+                    holds[i].update({node} if allocation_matrix[node][i] > 0 else set())
+
+                # Remove the process and all the resources it holds from the graph
+                for resource in graph:
+                    graph[resource].discard(node)
+                finished.add(node)
+
+                # Restart the search from the beginning
+                break
+            else:
+                queue.extend(graph[node] - finished)
+
+        else:  # The search ended without finding a process that can be completed
+            return True
+
+    # All processes have been completed with available resources
+    return False
+
+
+# Ask for input
+resource_count = int(input("Enter the number of resources: "))
+process_count = int(input("Enter the number of processes: "))
+
+# Build the allocation and request matrices
+allocation_matrix = []
+request_matrix = []
+for i in range(process_count):
+    allocation = list(map(int, input(f"Enter the allocation matrix for process {i}: ").split()))
+    request = list(map(int, input(f"Enter the request matrix for process {i}: ").split()))
+    allocation_matrix.append(allocation)
+    request_matrix.append(request)
+
+# Build the graph of dependencies between resources and processes
+graph = {i: set() for i in range(resource_count)}
+for i in range(process_count):
+    for j in range(resource_count):
+        if allocation_matrix[i][j] == 0 and request_matrix[i][j] > 0:
+            graph[j].add(i)
+
+# Check if there is a cycle in the graph
+if has_cycle(graph):
+    print("There is a deadlock in the system.")
+else:
+    # Make a copy of the graph and check for deadlock
+    graph_copy = {i: neighbors.copy() for i, neighbors in graph.items()}
+    if detect_deadlock(graph_copy, allocation_matrix, request_matrix):
+        print("There is a deadlock in the system.")
+    else:
+        print("There is no deadlock in the system.")
